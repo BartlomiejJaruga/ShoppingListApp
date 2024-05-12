@@ -1,0 +1,12 @@
+>Kategoria
+produkt1 2 x
+produkt2 500 ml
+produkt3 300 g
+>Kategoria2
+mleko 3 x
+stół 1 x
+krzesło 4 x
+deski 5.5 m
+>Kategoria3
+jajka 12 x
+szynka 0.3 kg

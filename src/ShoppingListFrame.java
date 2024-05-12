@@ -2,11 +2,91 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.List;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
 import java.util.Vector;
+import java.io.File;
 
 public class ShoppingListFrame {
-    public static final String APP_VERSION = "v0.0.1";
+    public static final String APP_VERSION = "v0.0.2";
+    public static final String DEFAULT_LOADING_FILE = "shopping_list.txt";
+    private final Vector<Category> categoriesAndProducts = new Vector<>();
+
+
+
+
+
+    public void loadShoppingListFromFile(String file){
+        try{
+            File fileIn = new File(file);
+            Scanner fileScanner = new Scanner(fileIn);
+            Category newCategory = new Category("dummyCategory");
+            while(fileScanner.hasNextLine()){
+                String fileLine = fileScanner.nextLine().trim();
+                if(fileLine.startsWith(">")){
+                    newCategory = new Category(fileLine.substring(1));
+                    categoriesAndProducts.add(newCategory);
+                }
+                else{
+                    String[] productParts = fileLine.split(" ");
+                    Product newProduct = new Product(
+                            productParts[0],
+                            Float.parseFloat(productParts[1]),
+                            productParts[2]
+                    );
+                    newCategory.addNewProduct(newProduct);
+                }
+            }
+            fileScanner.close();
+        }
+        catch (FileNotFoundException e){
+            System.out.println("Nie znaleziono pliku do zaladowania listy zakupow.");
+        }
+    }
+
+
+    public void generateProductsInCategoryPanel(JPanel categoryPanel, Category category){
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.anchor = GridBagConstraints.WEST;
+        int gx = 1, gy = 1;
+        JLabel categoryNameLabel = new JLabel(category.getName() + ":");
+        gbc.gridx = gx;     gbc.gridy = gy;
+        categoryPanel.add(categoryNameLabel, gbc);
+
+        gx = 2;
+        gbc.gridx = gx;
+        gy++;
+        for(Product product : category.returnAllCategoryProducts()){
+            JPanel productPanel = new JPanel(new GridLayout(1, 2));
+            JLabel productDataLabel = new JLabel(product.toString());
+            JButton deleteProductBtn = new JButton("X");
+            // TODO add listener to button
+            productPanel.add(productDataLabel);
+            productPanel.add(deleteProductBtn);
+            deleteProductBtn.setPreferredSize(new Dimension(100, 40));
+            gbc.gridy = gy;
+            categoryPanel.add(productPanel, gbc);
+            gy++;
+        }
+    }
+
+    public void generateShoppingList(JPanel shoppingListPanel){
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.gridx = 1;
+        int gy = 1;
+        for(Category category : categoriesAndProducts){
+            JPanel nextCategoryPanel = new JPanel(new GridBagLayout());
+            generateProductsInCategoryPanel(nextCategoryPanel, category);
+            gbc.gridy = gy;
+            shoppingListPanel.add(nextCategoryPanel, gbc);
+            gy++;
+        }
+    }
+
+    public int getCategoriesSize(){
+        return this.categoriesAndProducts.size();
+    }
 
     public void start() {
         JFrame frame = new JFrame("Shopping List");
@@ -15,8 +95,8 @@ public class ShoppingListFrame {
         JPanel viewingProductsMainPanel = new JPanel(); // viewing products on shopping list main panel contains 2 smaller panels
         viewingProductsMainPanel.setLayout(new GridLayout(1,2));
 
-        JPanel shoppingListPanel = new JPanel(); // subpanel of viewingProductsPanel, constains shopping list
-        shoppingListPanel.setLayout(new GridLayout(3,1));
+        JPanel shoppingListPanel = new JPanel(new GridBagLayout()); // subpanel of viewingProductsPanel, constains shopping list
+
         JPanel optionsPanel = new JPanel(); // subpanel of viewingProductsPanel, constains options to manage SL
         optionsPanel.setLayout(new GridLayout(3, 1));
 
@@ -69,7 +149,6 @@ public class ShoppingListFrame {
         newProductQuantityPanel.add(newProductQuantityTextField, gbc);
         gbc.gridx = 2;  gbc.gridy = 2;
         newProductQuantityPanel.add(newProductQuantityTypeComboBox, gbc);
-
         JPanel newProductAddAndCancelButtonsPanel = new JPanel(new FlowLayout());
         JButton newProductAddButton = new JButton("Add");
         JButton newProductCancelButton = new JButton("Cancel");
@@ -109,26 +188,9 @@ public class ShoppingListFrame {
 
 
 
-        // example of adding category and product
-        JLabel category1 = new JLabel("Kategoria1:");
-        JPanel cat1prod1 = new JPanel();
-        cat1prod1.setLayout(new GridLayout(1, 2));
-        JLabel product1 = new JLabel("Product 1\t2x");
-        JButton prod1delete = new JButton("X");
-        cat1prod1.add(product1);
-        cat1prod1.add(prod1delete);
-        JPanel cat1prod2 = new JPanel();
-        cat1prod2.setLayout(new GridLayout(1, 2));
-        JLabel product2 = new JLabel("Product 2\t500ml");
-        JButton prod2delete = new JButton("X");
-        cat1prod2.add(product2);
-        cat1prod2.add(prod2delete);
+        loadShoppingListFromFile(DEFAULT_LOADING_FILE);
 
-
-        // example of adding 1 category to shoppingListPanel
-        shoppingListPanel.add(category1);
-        shoppingListPanel.add(cat1prod1);
-        shoppingListPanel.add(cat1prod2);
+        generateShoppingList(shoppingListPanel);
 
 
 
@@ -159,6 +221,8 @@ public class ShoppingListFrame {
 
         // starting frame        [DONE]
         frame.getContentPane().add(viewingProductsMainPanel);
+        frame.setMinimumSize(new Dimension(500,500));
+        frame.setMaximumSize(new Dimension(1500,1500));
         frame.pack();
         frame.setVisible(true);
     }
