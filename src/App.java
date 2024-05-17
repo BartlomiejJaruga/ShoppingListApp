@@ -1,6 +1,6 @@
 public class App {
     public static void main(String[] args) {
-        ShoppingListFrame App = new ShoppingListFrame();
-        App.start();
+        ShoppingListFrame ShoppingListApp = new ShoppingListFrame();
+        ShoppingListApp.start();
     }
 }

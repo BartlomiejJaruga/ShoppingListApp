@@ -3,7 +3,7 @@ import java.util.Vector;
 
 public class Category {
     private final Vector<Product> allProducts = new Vector<>();
-    private String name;
+    private final String name;
     private JPanel parentPanel = null;
 
     Category(String name){
@@ -14,10 +14,29 @@ public class Category {
         for(Product product : allProducts){
             if(product.getName().equals(newProduct.getName())){
                 product.changeQuantityTo(product.getQuantity() + newProduct.getQuantity());
+                //todo add second function product.checkQuantityType() ktora odpala product.changeQuantityType()
                 return;
             }
         }
         allProducts.add(newProduct);
+    }
+
+    public void removeProduct(Product productToDelete){
+        for(Product product : allProducts){
+            if(product.getName().equals(productToDelete.getName())){
+                allProducts.remove(product);
+                break;
+            }
+        }
+    }
+
+    public boolean contains(Product product){
+        for(Product prod : allProducts){
+            if(prod.getName().equals(product.getName())){
+                return true;
+            }
+        }
+        return false;
     }
 
     public String getName(){

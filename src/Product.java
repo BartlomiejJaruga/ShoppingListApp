@@ -27,6 +27,10 @@ public class Product {
 
     @Override
     public String toString(){
-        return getName() + " " + getQuantity() + getQuantityType();
+        String roundedValue = String.format("%.0f", this.getQuantity());
+        if(Math.abs(this.getQuantity() - Float.parseFloat(roundedValue)) > 0.001){
+            return getName() + " " + getQuantity() + getQuantityType();
+        }
+        return getName() + " " + roundedValue + getQuantityType();
     }
 }
