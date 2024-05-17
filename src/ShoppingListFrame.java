@@ -9,7 +9,7 @@ import java.util.Vector;
 import java.io.File;
 
 public class ShoppingListFrame {
-    public static final String APP_VERSION = "v0.0.2";
+    public static final String APP_VERSION = "v0.0.4";
     public static final String DEFAULT_LOADING_FILE = "shopping_list.txt";
     public static final String ADDING_NEW_PRODUCT_VIEW_NAME = "adding_new_product_view";
     public static final String VIEWING_PRODUCTS_VIEW_NAME = "viewing_products_view";
