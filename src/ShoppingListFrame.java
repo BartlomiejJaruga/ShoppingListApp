@@ -1,26 +1,33 @@
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.FileNotFoundException;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.*;
 import java.util.Scanner;
 import java.util.Vector;
-import java.io.File;
 
 public class ShoppingListFrame {
-    public static final String APP_VERSION = "v0.0.4";
     public static final String DEFAULT_LOADING_FILE = "shopping_list.txt";
     public static final String ADDING_NEW_PRODUCT_VIEW_NAME = "adding_new_product_view";
     public static final String VIEWING_PRODUCTS_VIEW_NAME = "viewing_products_view";
     public static final String ADDING_NEW_CATEGORY_VIEW_NAME = "adding_new_category_view";
     public static final String ADDING_NEW_CATEGORY_BUTTON_VIEW_NAME = "adding_new_category_button_view";
+    public static final String CLEARING_LIST_CONFIRM_VIEW_NAME = "clearing_list_confirm_view";
+    public static final String CLEARING_LIST_BUTTON_VIEW_NAME = "clearing_list_button_view";
     private static final String[] ACCEPTABLE_QUANTITY_TYPES = {"x", "g", "dag", "kg", "mm", "cm", "m", "ml", "l"};
 
     private final Vector<Category> categoriesAndProducts = new Vector<>();
     private final Vector<String> categoriesNames = new Vector<>();
+    private JPanel clearingListPanel;
     private JPanel shoppingListPanel;
     private JPanel newProductFormPanel;
+    private JTextField newProductNameTextField;
+    private JTextField newProductQuantityTextField;
+    private JComboBox<String> newProductQuantityTypeComboBox;
+    private JComboBox<String> newProductCategoryComboBox;
 
 
 
@@ -30,7 +37,7 @@ public class ShoppingListFrame {
         try{
             File fileIn = new File(file);
             Scanner fileScanner = new Scanner(fileIn);
-            Category newCategory = new Category("dummyCategory");
+            Category newCategory = new Category("foo");
             while(fileScanner.hasNextLine()){
                 String fileLine = fileScanner.nextLine().trim();
                 if(fileLine.startsWith(">")){
@@ -38,7 +45,7 @@ public class ShoppingListFrame {
                     categoriesAndProducts.add(newCategory);
                 }
                 else{
-                    String[] productParts = fileLine.split(" ");
+                    String[] productParts = fileLine.split("\\|");
                     Product newProduct = new Product(
                             productParts[0],
                             Float.parseFloat(productParts[1]),
@@ -50,11 +57,22 @@ public class ShoppingListFrame {
             fileScanner.close();
         }
         catch (FileNotFoundException e){
-            System.out.println("Nie znaleziono pliku do zaladowania listy zakupow.");
+            System.out.println("File to load shopping list wasn't found, it will be created when exiting app.");
         }
     }
 
-    //todo dodac zapis do listy do pliku
+    public void saveShoppingListToFile(String file) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
+            for (Category category : categoriesAndProducts) {
+                writer.println(">" + category.getName());
+                for (Product product : category.returnAllCategoryProducts()) {
+                    writer.println(product.getName() + "|" + product.getQuantity() + "|" + product.getQuantityType());
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("An error occurred while saving the list - failed to create file.");
+        }
+    }
 
     public void clearShoppingList(){
         Component[] components = shoppingListPanel.getComponents();
@@ -78,9 +96,13 @@ public class ShoppingListFrame {
     }
 
     public void generateProductPanel(Product product, JPanel categoryPanel, Category category, GridBagConstraints gbc){
-        JPanel productPanel = new JPanel(new GridLayout(1, 2));
+        JPanel productPanel = new JPanel();
+        productPanel.setLayout(new BoxLayout(productPanel, BoxLayout.X_AXIS));
         JLabel productDataLabel = new JLabel(product.toString());
+        productDataLabel.setFont(new Font("Serif", Font.PLAIN, 20));
+        productDataLabel.setBorder(new EmptyBorder(0, 0, 5, 10));
         JButton deleteProductBtn = new JButton("X");
+        deleteProductBtn.setFont(new Font("Serif", Font.BOLD, 14));
         deleteProductBtn.addActionListener(e -> {
             category.removeProduct(product);
             categoryPanel.removeAll();
@@ -94,7 +116,7 @@ public class ShoppingListFrame {
         });
         productPanel.add(productDataLabel);
         productPanel.add(deleteProductBtn);
-        deleteProductBtn.setPreferredSize(new Dimension(100, 40));
+        deleteProductBtn.setPreferredSize(new Dimension(45, 45));
         categoryPanel.add(productPanel, gbc);
     }
 
@@ -103,6 +125,7 @@ public class ShoppingListFrame {
         gbc.anchor = GridBagConstraints.WEST;
         int gx = 1, gy = 1;
         JLabel categoryNameLabel = new JLabel(category.getName() + ":");
+        categoryNameLabel.setFont(new Font("Serif", Font.BOLD, 20));
         gbc.gridx = gx;     gbc.gridy = gy;
         categoryPanel.add(categoryNameLabel, gbc);
 
@@ -177,20 +200,9 @@ public class ShoppingListFrame {
         updateProductList(categoryName, newProduct);
     }
 
-    public JComboBox<?> getCategoryComboBox(){
-        JPanel categoriesPanel = (JPanel) newProductFormPanel.getComponent(2); //index of choosing category
-        JComboBox<?> categoriesComboBox = null;
-        for(Component component : categoriesPanel.getComponents()){
-            if(component instanceof JComboBox<?>){
-                categoriesComboBox = (JComboBox<?>) component;
-            }
-        }
-        return categoriesComboBox;
-    }
-
     public void updateCategoryComboBox(){
-        JComboBox<?> categoriesComboBox = getCategoryComboBox();
-        if(categoriesComboBox == null) return;
+        JComboBox<?> categoriesComboBox = newProductCategoryComboBox;
+        setNewProductCategoryComboBoxBorderBlack();
         categoriesComboBox.setSelectedItem(null);
         categoriesComboBox.getParent().revalidate();
         categoriesComboBox.getParent().repaint();
@@ -220,9 +232,14 @@ public class ShoppingListFrame {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.anchor = GridBagConstraints.WEST;
         gbc.gridx = 1;
-        JPanel lastCategoryPanel = (JPanel) shoppingListPanel.getComponent(shoppingListPanel.getComponentCount()-1);
-        GridBagConstraints lastCategoryGBC = ((GridBagLayout)shoppingListPanel.getLayout()).getConstraints(lastCategoryPanel);
-        gbc.gridy = lastCategoryGBC.gridy + 1;
+        if(shoppingListPanel.getComponentCount() > 0){
+            JPanel lastCategoryPanel = (JPanel) shoppingListPanel.getComponent(shoppingListPanel.getComponentCount()-1);
+            GridBagConstraints lastCategoryGBC = ((GridBagLayout)shoppingListPanel.getLayout()).getConstraints(lastCategoryPanel);
+            gbc.gridy = lastCategoryGBC.gridy + 1;
+        }
+        else{
+            gbc.gridy = 1;
+        }
         JPanel newCategoryPanel = generateCategoryPanel(newCategory);
         shoppingListPanel.add(newCategoryPanel, gbc);
         shoppingListPanel.revalidate();
@@ -252,93 +269,103 @@ public class ShoppingListFrame {
     public void addNewCategory(){
         JTextField newCategoryTextField = getNewCategoryTextField();
         if(newCategoryTextField == null) return;
+        if(newCategoryTextField.getText().isEmpty()){
+            return;
+        }
         Category newCategory = new Category(newCategoryTextField.getText());
         categoriesAndProducts.add(newCategory);
         categoriesNames.add(newCategory.getName());
+        newCategoryTextField.setText("");
         updateCategoryComboBox();
         addNewCategoryToShoppingListPanel(newCategory);
+    }
+
+    public JPanel generateAddingNewCategoryInputTextPanel(JPanel addingNewCategoryPanel){
+        JPanel addingNewCategoryInputTextPanel = new JPanel(new GridLayout(2,2));
+        JLabel newCategoryLabel = new JLabel("New category name:");
+        JTextField newCategoryInput = new JTextField(15);
+        newCategoryInput.setFont(new Font("Serif", Font.PLAIN, 16));
+        JButton newCategoryAddButton = new JButton("ACCEPT");
+        newCategoryAddButton.addActionListener(e -> {
+            addNewCategory();
+            showAddingNewCategoryButtonView(addingNewCategoryPanel);
+        });
+        JButton newCategoryCancelButton = new JButton("CANCEL");
+        newCategoryCancelButton.addActionListener(e -> {
+            newCategoryInput.setText("");
+            showAddingNewCategoryButtonView(addingNewCategoryPanel);
+        });
+        addingNewCategoryInputTextPanel.add(newCategoryLabel);
+        addingNewCategoryInputTextPanel.add(newCategoryAddButton);
+        addingNewCategoryInputTextPanel.add(newCategoryInput);
+        addingNewCategoryInputTextPanel.add(newCategoryCancelButton);
+
+        return addingNewCategoryInputTextPanel;
     }
 
     public JPanel generateAddingNewCategoryPanel(){
         JPanel addingNewCategoryPanel = new JPanel(new CardLayout());
 
         JButton addNewCategoryButton = new JButton("Add new category");
+        addNewCategoryButton.setFont(new Font("Serif", Font.BOLD, 16));
         addNewCategoryButton.addActionListener(e -> {
             showInputTextForNewCategoryView(addingNewCategoryPanel);
         });
 
-        JPanel addingNewCategoryInputTextPanel = new JPanel(new GridLayout(1,2));
-        JTextField newCategoryInput = new JTextField(15);
-        JButton newCategoryAddButton = new JButton("ACCEPT");
-        newCategoryAddButton.addActionListener(e -> {
-            addNewCategory();
-            showAddingNewCategoryButtonView(addingNewCategoryPanel);
-        });
-        addingNewCategoryInputTextPanel.add(newCategoryInput);
-        addingNewCategoryInputTextPanel.add(newCategoryAddButton);
-
         addingNewCategoryPanel.add(addNewCategoryButton, ADDING_NEW_CATEGORY_BUTTON_VIEW_NAME);
-        addingNewCategoryPanel.add(addingNewCategoryInputTextPanel, ADDING_NEW_CATEGORY_VIEW_NAME);
+        addingNewCategoryPanel.add(generateAddingNewCategoryInputTextPanel(addingNewCategoryPanel), ADDING_NEW_CATEGORY_VIEW_NAME);
         showAddingNewCategoryButtonView(addingNewCategoryPanel);
 
         return addingNewCategoryPanel;
     }
 
-    public JPanel generateAddingNewProductPanel(JPanel mainPanel){
-        JPanel addingNewProductPanel = new JPanel();
-        addingNewProductPanel.setLayout(new GridLayout(3,1));
-
+    public JLabel generateAddingNewProductHeader(){
         JLabel addingNewProductHeader = new JLabel("<html><u>Adding New Product</u></html>");
+        addingNewProductHeader.setFont(new Font("Serif", Font.ITALIC, 36));
+        addingNewProductHeader.setBorder(new EmptyBorder(0, 0, 30, 0));
+        return addingNewProductHeader;
+    }
 
-        newProductFormPanel = new JPanel();
-        newProductFormPanel.setLayout(new FlowLayout());
-
+    public JPanel generateNewProductNamePanel(){
         JPanel newProductNamePanel = new JPanel();
         newProductNamePanel.setLayout(new GridLayout(2,1));
         JLabel newProductNameLabel = new JLabel("Name:");
-        JTextField newProductNameTextField = new JTextField(30);
+        newProductNameLabel.setFont(new Font("Serif", Font.BOLD, 16));
+        newProductNameTextField = new JTextField(20);
+        newProductNameTextField.setFont(new Font("Serif", Font.PLAIN, 16));
+        setNewProductNameInputBorderBlack();
         newProductNamePanel.add(newProductNameLabel);
         newProductNamePanel.add(newProductNameTextField);
+        return newProductNamePanel;
+    }
 
+    public JPanel generateNewProductCategoryPanel(){
         JPanel newProductCategoryPanel = new JPanel();
         newProductCategoryPanel.setLayout(new GridLayout(2,1));
         JLabel newProductCategoryLabel = new JLabel("Category:");
+        newProductCategoryLabel.setFont(new Font("Serif", Font.BOLD, 16));
         for(Category category : categoriesAndProducts){
             categoriesNames.add(category.getName());
         }
-        JComboBox<String> newProductCategoryComboBox = new JComboBox<>(categoriesNames);
+        newProductCategoryComboBox = new JComboBox<>(categoriesNames);
+        newProductCategoryComboBox.setFont(new Font("Serif", Font.PLAIN, 16));
+        setNewProductCategoryComboBoxBorderBlack();
         newProductCategoryPanel.add(newProductCategoryLabel);
         newProductCategoryPanel.add(newProductCategoryComboBox);
+        return newProductCategoryPanel;
+    }
 
+    public JPanel generateNewProductQuantityPanel(){
         JPanel newProductQuantityPanel = new JPanel();
         newProductQuantityPanel.setLayout(new GridBagLayout());
         JLabel newProductQuantityLabel = new JLabel("Quantity:");
-        JTextField newProductQuantityTextField = new JTextField(10);
-        ((AbstractDocument) newProductQuantityTextField.getDocument()).setDocumentFilter(new DocumentFilter() {
-            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
-                if (string.isEmpty()
-                        || isDigit(string)
-                        || string.equals(".")
-                        && !newProductQuantityTextField.getText().contains(".")) {
-                    super.insertString(fb, offset, string, attr);
-                }
-            }
-
-            @Override
-            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
-                if (text.isEmpty() || isDigit(text) || text.equals(".")) {
-                    if ((text.equals(".")) && !newProductQuantityTextField.getText().contains(".")) {
-                        super.replace(fb, offset, length, text, attrs);
-                    } else if (!text.equals(".")) {
-                        super.replace(fb, offset, length, text, attrs);
-                    }
-                }
-            }
-            private boolean isDigit(String text) {
-                return text != null && text.matches("\\d");
-            }
-        });
-        JComboBox<String> newProductQuantityTypeComboBox = new JComboBox<>(ACCEPTABLE_QUANTITY_TYPES);
+        newProductQuantityLabel.setFont(new Font("Serif", Font.BOLD, 16));
+        newProductQuantityTextField = new JTextField(10);
+        newProductQuantityTextField.setFont(new Font("Serif", Font.PLAIN, 16));
+        setNewProductQuantityInputBorderBlack();
+        ((AbstractDocument) newProductQuantityTextField.getDocument()).setDocumentFilter(new QuantityFilter(newProductQuantityTextField));
+        newProductQuantityTypeComboBox = new JComboBox<>(ACCEPTABLE_QUANTITY_TYPES);
+        newProductQuantityTypeComboBox.setFont(new Font("Serif", Font.PLAIN, 16));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 1;  gbc.gridy = 1;
         newProductQuantityPanel.add(newProductQuantityLabel, gbc);
@@ -346,85 +373,218 @@ public class ShoppingListFrame {
         newProductQuantityPanel.add(newProductQuantityTextField, gbc);
         gbc.gridx = 2;  gbc.gridy = 2;
         newProductQuantityPanel.add(newProductQuantityTypeComboBox, gbc);
+        return newProductQuantityPanel;
+    }
+
+    private void setNewProductNameInputBorderBlack(){
+        newProductNameTextField.setBorder(new LineBorder(Color.BLACK, 1));
+    }
+
+    private void setNewProductNameInputBorderRed(){
+        newProductNameTextField.setBorder(new LineBorder(Color.RED, 2));
+    }
+
+    private void setNewProductQuantityInputBorderBlack(){
+        newProductQuantityTextField.setBorder(new LineBorder(Color.BLACK, 1));
+    }
+
+    private void setNewProductQuantityInputBorderRed(){
+        newProductQuantityTextField.setBorder(new LineBorder(Color.RED, 2));
+    }
+
+    private void setNewProductCategoryComboBoxBorderBlack(){
+        newProductCategoryComboBox.setBorder(new LineBorder(Color.BLACK, 1));
+    }
+
+    private void setNewProductCategoryComboBoxBorderRed(){
+        newProductCategoryComboBox.setBorder(new LineBorder(Color.RED, 2));
+    }
+
+    public boolean isNewProductDataValid(String productName,
+                                         String productQuantity,
+                                         Object category){
+        boolean isValid = true;
+        if(productName.isEmpty()){
+            setNewProductNameInputBorderRed();
+            isValid = false;
+        }
+        else{
+            setNewProductNameInputBorderBlack();
+        }
+        if(productQuantity.isEmpty()){
+            setNewProductQuantityInputBorderRed();
+            isValid = false;
+        }
+        else{
+            setNewProductQuantityInputBorderBlack();
+        }
+        if(category == null){
+            setNewProductCategoryComboBoxBorderRed();
+            isValid = false;
+        }
+        else{
+            setNewProductCategoryComboBoxBorderBlack();
+        }
+        return isValid;
+    }
+
+    public boolean addNewProductToCategoryHandler(){
+        if(!isNewProductDataValid(newProductNameTextField.getText(),
+                                  newProductQuantityTextField.getText(),
+                                  newProductCategoryComboBox.getSelectedItem())){
+            return false;
+        }
+        String productName = newProductNameTextField.getText();
+        float productQuantity = Float.parseFloat(newProductQuantityTextField.getText());
+        String productQuantityType = (String) newProductQuantityTypeComboBox.getSelectedItem();
+        String productCategory = (String) newProductCategoryComboBox.getSelectedItem();
+        Product newProduct = new Product(productName, productQuantity, productQuantityType);
+        addNewProductToCategory(productCategory, newProduct);
+
+        newProductNameTextField.setText("");
+        newProductQuantityTextField.setText("");
+        setNewProductNameInputBorderBlack();
+        setNewProductQuantityInputBorderBlack();
+
+        return true;
+    }
+
+    public JPanel generateNewProductFormButtonsPanel(JPanel mainPanel){
         JPanel newProductAddAndCancelButtonsPanel = new JPanel(new FlowLayout());
         JButton newProductAddButton = new JButton("Add");
+        newProductAddButton.setPreferredSize(new Dimension(100, 40));
+        newProductAddButton.setFont(new Font("Serif", Font.BOLD, 16));
         JButton newProductCancelButton = new JButton("Cancel");
+        newProductCancelButton.setPreferredSize(new Dimension(100, 40));
+        newProductCancelButton.setFont(new Font("Serif", Font.BOLD, 16));
         newProductAddAndCancelButtonsPanel.add(newProductAddButton);
         newProductAddAndCancelButtonsPanel.add(newProductCancelButton);
-        // adding actionListeners to buttons
+
         newProductAddButton.addActionListener(e -> {
-            String productName = newProductNameTextField.getText();
-            Float productQuantity = Float.parseFloat(newProductQuantityTextField.getText());
-            String productQuantityType = (String) newProductQuantityTypeComboBox.getSelectedItem();
-            String productCategory = (String) newProductCategoryComboBox.getSelectedItem();
-            Product newProduct = new Product(productName, productQuantity, productQuantityType);
-            addNewProductToCategory(productCategory, newProduct);
-            newProductNameTextField.setText("");
-            newProductQuantityTextField.setText("");
+            if(!addNewProductToCategoryHandler()){
+                return;
+            }
             showViewingProductsView(mainPanel);
         });
         newProductCancelButton.addActionListener(e -> {
             showViewingProductsView(mainPanel);
         });
 
-        JPanel addingNewCategoryPanel = generateAddingNewCategoryPanel();
+        return newProductAddAndCancelButtonsPanel;
+    }
 
-        newProductFormPanel.add(newProductNamePanel);
-        newProductFormPanel.add(newProductQuantityPanel);
-        newProductFormPanel.add(newProductCategoryPanel);
-        newProductFormPanel.add(addingNewCategoryPanel);
+    public JPanel generateNewProductFormPanel(){
+        newProductFormPanel = new JPanel(new GridLayout(4,1));
+        newProductFormPanel.setBorder(new EmptyBorder(0, 0, 30, 0));
 
+        newProductFormPanel.add(generateNewProductNamePanel());
+        newProductFormPanel.add(generateNewProductCategoryPanel());
+        newProductFormPanel.add(generateNewProductQuantityPanel());
+        newProductFormPanel.add(generateAddingNewCategoryPanel());
 
-        addingNewProductPanel.add(addingNewProductHeader);
-        addingNewProductPanel.add(newProductFormPanel);
-        addingNewProductPanel.add(newProductAddAndCancelButtonsPanel);
+        return newProductFormPanel;
+    }
+
+    public JPanel generateAddingNewProductPanel(JPanel mainPanel){
+        JPanel addingNewProductPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 1;      gbc.gridy = 1;
+        addingNewProductPanel.add(generateAddingNewProductHeader(), gbc);
+        gbc.gridy = 2;
+        addingNewProductPanel.add(generateNewProductFormPanel(), gbc);
+        gbc.gridy = 3;
+        addingNewProductPanel.add(generateNewProductFormButtonsPanel(mainPanel), gbc);
 
         return addingNewProductPanel;
     }
 
+    public JPanel generateShoppingListPanel(){
+        shoppingListPanel = new JPanel(new GridBagLayout());
+        generateShoppingList();
+        return shoppingListPanel;
+    }
 
-    public JPanel generateViewingProductsPanel(JPanel mainPanel){
-        // creating main panel - viewing products         [DONE]
-        JPanel viewingProductsMainPanel = new JPanel(); // viewing products on shopping list main panel contains 2 smaller panels
-        viewingProductsMainPanel.setLayout(new GridLayout(1,2));
+    public JPanel generateConfirmationClearingListPanel(){
+        JPanel confirmationClearingListPanel = new JPanel(new GridLayout(1,2));
 
-        shoppingListPanel = new JPanel(new GridBagLayout()); // subpanel of viewingProductsPanel, constains shopping list
+        JButton confirmClearButton = new JButton("CONFIRM");
+        confirmClearButton.setFont(new Font("Serif", Font.BOLD, 20));
+        confirmClearButton.setForeground(Color.WHITE);
+        confirmClearButton.setBorder(new LineBorder(new Color(0, 200, 0), 3));
+        confirmClearButton.setBackground(new Color(0, 150, 0));
+        confirmClearButton.addActionListener(e -> {
+            clearShoppingList();
+            showClearShoppingListButtonView();
+        });
+        JButton cancelClearButton = new JButton("CANCEL");
+        cancelClearButton.setFont(new Font("Serif", Font.BOLD, 20));
+        cancelClearButton.setBorder(new LineBorder(new Color(200, 0, 0), 3));
+        cancelClearButton.setForeground(Color.WHITE);
+        cancelClearButton.setBackground(new Color(150, 0, 0));
+        cancelClearButton.addActionListener(e -> {
+            showClearShoppingListButtonView();
+        });
 
-        JPanel optionsPanel = new JPanel(); // subpanel of viewingProductsPanel, constains options to manage SL
+        confirmationClearingListPanel.add(cancelClearButton);
+        confirmationClearingListPanel.add(confirmClearButton);
+
+        return confirmationClearingListPanel;
+    }
+
+    public void showClearShoppingListButtonView(){
+        CardLayout layout = (CardLayout) clearingListPanel.getLayout();
+        layout.show(clearingListPanel, CLEARING_LIST_BUTTON_VIEW_NAME);
+    }
+
+    public void showConfirmationClearingListPanel(){
+        CardLayout layout = (CardLayout) clearingListPanel.getLayout();
+        layout.show(clearingListPanel, CLEARING_LIST_CONFIRM_VIEW_NAME);
+    }
+
+    public JPanel generateClearingListPanel(){
+        clearingListPanel = new JPanel(new CardLayout());
+
+        JButton clearShoppingListButton = new JButton("Clear Shopping List");
+        clearShoppingListButton.setFont(new Font("Serif", Font.BOLD, 20));
+        clearShoppingListButton.addActionListener(e -> {
+            showConfirmationClearingListPanel();
+        });
+
+        clearingListPanel.add(generateConfirmationClearingListPanel(), CLEARING_LIST_CONFIRM_VIEW_NAME);
+        clearingListPanel.add(clearShoppingListButton, CLEARING_LIST_BUTTON_VIEW_NAME);
+        showClearShoppingListButtonView();
+
+        return clearingListPanel;
+    }
+
+    public JPanel generateOptionsPanel(JPanel mainPanel){
+        JPanel optionsPanel = new JPanel();
         optionsPanel.setLayout(new GridLayout(3, 1));
 
-        // creating optionsPanel         [DONE]
-        JButton clearShoppingListButton = new JButton("Clear Shopping List");
         JButton addNewProductButton = new JButton("Add New Product");
-        JLabel appVersion = new JLabel(APP_VERSION);
-
-        optionsPanel.add(clearShoppingListButton);
-        optionsPanel.add(addNewProductButton);
-        optionsPanel.add(appVersion);
-
-
-        // creating main panel - adding products
-
-
-
-        generateShoppingList();
-
-        //creating scrollPanel which contains product list
-        JScrollPane shoppingListScrollPane = new JScrollPane(shoppingListPanel);
-        shoppingListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        viewingProductsMainPanel.add(shoppingListScrollPane);
-        viewingProductsMainPanel.add(optionsPanel);
-
-        // adding actionListeners to buttons
-        clearShoppingListButton.addActionListener(e -> {
-            clearShoppingList();
-        });
+        addNewProductButton.setFont(new Font("Serif", Font.BOLD, 20));
         addNewProductButton.addActionListener(e -> {
             showAddingNewProductView(mainPanel);
         });
 
+        optionsPanel.add(generateClearingListPanel());
+        optionsPanel.add(addNewProductButton);
 
-        return viewingProductsMainPanel;
+        return optionsPanel;
+    }
+
+    public JPanel generateViewingProductsPanel(JPanel mainPanel){
+        JPanel viewingProductsPanel = new JPanel();
+        viewingProductsPanel.setLayout(new GridLayout(1,2));
+
+        JScrollPane shoppingListScrollPane = new JScrollPane(generateShoppingListPanel()); //scroll for shopping list
+        shoppingListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        shoppingListScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        viewingProductsPanel.add(shoppingListScrollPane);
+        viewingProductsPanel.add(generateOptionsPanel(mainPanel));
+
+        return viewingProductsPanel;
     }
 
     public JPanel generateMainPanel(){
@@ -456,8 +616,15 @@ public class ShoppingListFrame {
         JPanel mainPanel = generateMainPanel();
         showViewingProductsView(mainPanel);
 
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                saveShoppingListToFile(DEFAULT_LOADING_FILE);
+                System.exit(0);
+            }
+        });
         frame.getContentPane().add(mainPanel);
-        frame.setMinimumSize(new Dimension(500,500));
+        frame.setMinimumSize(new Dimension(500,600));
         frame.setMaximumSize(new Dimension(1500,1500));
         frame.pack();
         frame.setLocationRelativeTo(null);
