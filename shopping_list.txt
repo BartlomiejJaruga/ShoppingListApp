@@ -1,21 +1,21 @@
->Jedzenie
-Kukurydza|5.0|x
-Pomidor|3.0|kg
-Truskawki|1.0|kg
-Boczek|5.0|kg
-Sałata|3.0|x
+>Food
+Corn|5.0|x
+Tomato|3.0|kg
+Strawberries|1.0|kg
+Bacon|5.0|kg
+Lettuce|3.0|x
 Kefir|300.0|ml
-Cukierki|2.5|kg
-Szynka|0.3|kg
->Meble
-Stół|1.0|x
-Krzesło|4.0|x
-Poduszka|8.0|x
->Na Budowe
-deski|5.5|m
-Betoniarka|1.0|x
+Candies|2.5|kg
+Ham|0.3|kg
+>Furniture
+Table|1.0|x
+Chair|4.0|x
+Pillow|8.0|x
+>Construction
+Boards|5.5|m
+Concrete mixer|1.0|x
 Cement|4.75|kg
->Chemia
+>Cleaning Supplies
 Domestos|100.0|x
-Mydło w płynie|2.0|l
-Proszek do prania|50.0|kg
+Liquid soap|2.0|l
+Laundry detergent|50.0|kg
